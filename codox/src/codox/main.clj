@@ -55,7 +55,16 @@
 
 (defn- filter-namespaces [namespaces ns-filters]
   (if (and ns-filters (not= ns-filters :all))
-    (filter #(some (partial ns-matches? %) ns-filters) namespaces)
+    ;; tools.deps users can't include a regex literal in deps.edn files. Plain strings used as
+    ;; namespace filters are matched against using = already, so we need to distinguish strings
+    ;; meant to be regex patterns somehow. If a filter string begins with #re: convert it to a
+    ;; regular expression.
+    (let [ns-filters (mapv (fn [ns-filter] (if (and (string? ns-filter)
+                                                   (str/starts-with? ns-filter "#re:"))
+                                            (re-pattern (subs ns-filter 3))
+                                            ns-filter))
+                           ns-filters)]
+      (filter #(some (partial ns-matches? %) ns-filters) namespaces))
     namespaces))
 
 (defn- read-namespaces
